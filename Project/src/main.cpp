@@ -8,6 +8,9 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <iomanip>
+
+#include <cmath>
 
 #include <gl/glew.h>
 #include <gl/glut.h>
@@ -38,6 +41,11 @@ Vector3 worldCarSpeed; ///< Car speed in world space.
 
 float carDirection = 180;  ///< Car direction
 string carHeading = "N"; ///< String for car heading
+float carSpeed = 0.0f;
+float maxSpeed = 0.5f;
+float acceleration = 0.01f;
+float deceleration = 0.005f;
+float turnSpeed = 2.0f;
 
 Vector3	localCameraOffset = { 0, 0, -6 };  ///< Third person camera offset in the car's local space.
 Vector3 worldCameraOffset;  ///< Third person camera offset in world space.
@@ -55,17 +63,24 @@ void reshape(int w, int h)
 	winWidth = w, winHeight = h;
 
 	// Update sWidth and sHeight here.
+	sWidth = winWidth / 4;
+	sHeight = winHeight / 4;
 }
 
-/// Callback function for special keys.
-/// \param key ASCII code of the key pressed.
-/// \param x X coordinate of the mouse cursor when the key is pressed.
-/// \param y Y coordinate of the mouse cursor when the key is pressed.
+/**
+* Callback function for special keys.
+* \param key ASCII code of the key pressed.
+* \param x X coordinate of the mouse cursor when the key is pressed.
+* \param y Y coordinate of the mouse cursor when the key is pressed.
+*/
 void specialKey(int key, int x, int y)
 {
 	if (key == GLUT_KEY_LEFT)
 	{
 		// Update car direction
+		carDirection += turnSpeed;
+		if (carDirection >= 360)
+			carDirection -= 360;
 
 		// Update the third person camera offset in the world frame.
 
@@ -74,20 +89,26 @@ void specialKey(int key, int x, int y)
 	}
 	if (key == GLUT_KEY_RIGHT)
 	{
-		// Handle the right turns.
+		carDirection -= turnSpeed;
+		if (carDirection < 0)
+			carDirection += 360;
 	}
 	if (key == GLUT_KEY_UP)
 	{
-		// acceleration
+		carSpeed = min(maxSpeed, carSpeed + acceleration);
 	}
 
 	if (key == GLUT_KEY_DOWN)
 	{
-		// deceleration
+		carSpeed = max(-maxSpeed / 2, carSpeed - acceleration);
 	}
+
+	glutPostRedisplay();
 }
 
-/// Function to draw the entire scene.
+/**
+* Function to draw the entire scene.
+*/
 void drawScene()
 {
 	// Draw terrain
@@ -110,12 +131,64 @@ void drawScene()
 	glPopMatrix();
 
 	// South-West (NS_Signal)
+	glPushMatrix();
+	glTranslatef(-10, 0, 10.5);
+	glRotatef(180, 0, 1, 0);
+	glScalef(1/3.28/12, 1/3.28/12, 1/3.28/12);
+	trafficLight.setSignal(NS_Signal);
+	trafficLight.Draw();
+	glPopMatrix();
+
+	glPushMatrix();
+	glTranslatef(-10, 0, 10);
+	glRotatef(135, 0, 1, 0);
+	glCallList(surveillanceCameraID);
+	glPopMatrix();
 
 	// South-East (WE_Signal)
+	glPushMatrix();
+	glTranslatef(10, 0, 10.5);
+	glRotatef(-90, 0, 1, 0);
+	glScalef(1/3.28/12, 1/3.28/12, 1/3.28/12);
+	trafficLight.setSignal(WE_Signal);
+	trafficLight.Draw();
+	glPopMatrix();
+
+	glPushMatrix();
+	glTranslatef(10, 0, 10);
+	glRotatef(-135, 0, 1, 0);
+	glCallList(surveillanceCameraID);
+	glPopMatrix();
 
 	// North-West (WE_Signal)
+	glPushMatrix();
+	glTranslatef(-10, 0, -10.5);
+	glRotatef(90, 0, 1, 0);
+	glScalef(1/3.28/12, 1/3.28/12, 1/3.28/12);
+	trafficLight.setSignal(WE_Signal);
+	trafficLight.Draw();
+	glPopMatrix();
+
+	glPushMatrix();
+	glTranslatef(-10, 0, -10);
+	glRotatef(45, 0, 1, 0);
+	glCallList(surveillanceCameraID);
+	glPopMatrix();
 
 	// Draw the car.
+	glPushMatrix();
+		// Position the car
+		glTranslatef(carPosition.x, carPosition.y, carPosition.z);
+
+		// Rotate the car based on its direction
+		glRotatef(carDirection, 0, 1, 0); // Rotate around the Y axis
+
+		// Scale the car
+		glScalef(1/3.28/12, 1/3.28/12, 1/3.28/12);
+
+		// Draw the car using display list
+		glCallList(carID);
+	glPopMatrix();
 }
 
 /// Initialization.
@@ -157,13 +230,19 @@ void init()
 	glEndList();
 
 	// Generate display list for the car.
+	carID = glGenLists(1);
+	glNewList(carID, GL_COMPILE);
+	car.Draw();
+	glEndList();
 
 	// Generate the display list for terrain, including road and grass.
 	terrainID = glGenLists(1);
 	glNewList(terrainID, GL_COMPILE);
 	glDisable(GL_LIGHTING);
 
-	// Grass
+	/*************************************************
+	* Grass
+	*************************************************/
 	glColor3f(0, 0.7, 0);
 	glBegin(GL_QUADS);
 		glVertex3f(-1000, 0, 1000);
@@ -187,29 +266,114 @@ void init()
 		glVertex3f(-1000, 0, -1000);
 	glEnd();
 
-	// Roads
+	/*************************************************
+	* Roads
+	*************************************************/
 	glBegin(GL_QUADS);
 		glColor3f(0.2, 0.2, 0.2);
 
+		// North-South road
 		glVertex3f(-10, 0, 1000);
 		glVertex3f(10, 0, 1000);
 		glVertex3f(10, 0, -1000);
 		glVertex3f(-10, 0, -1000);
 
+		// East-West road
 		glVertex3f(-1000, 0, 10);
 		glVertex3f(1000, 0, 10);
 		glVertex3f(1000, 0, -10);
 		glVertex3f(-1000, 0, -10);
 	glEnd();
 
-	// Yellow line
-	glBegin(GL_POLYGON);
-		glColor3f(1, 1, 0);
-		glVertex3f(-0.1, 0.05, 1000);
+	/*************************************************
+	* Yellow centerlines
+	*************************************************/
+	glColor3f(1, 1, 0);
+
+	// North section centerline
+	glBegin(GL_QUADS);
+		glVertex3f(-0.1, 0.05, 1000); // Start from far North
 		glVertex3f(0.1, 0.05, 1000);
-		glVertex3f(0.1, 0.05, -1000);
+		glVertex3f(0.1, 0.05, 10); // Stop at intersection
+		glVertex3f(-0.1, 0.05, 10);
+	glEnd();
+
+	// South section centerline
+	glBegin(GL_QUADS);
+		glVertex3f(-0.1, 0.05, -10); // Start from intersection
+		glVertex3f(0.1, 0.05, -10);
+		glVertex3f(0.1, 0.05, -1000); // Go to far south
 		glVertex3f(-0.1, 0.05, -1000);
 	glEnd();
+
+	// West section centerline
+	glBegin(GL_QUADS);
+		glVertex3f(-1000, 0.05, 0.1); // Start from far west
+		glVertex3f(-10, 0.05, 0.1); // Stop at intersection
+		glVertex3f(-10, 0.05, -0.1);
+		glVertex3f(-1000, 0.05, -0.1);
+	glEnd();
+
+	// East section centerline
+	glBegin(GL_QUADS);
+		glVertex3f(10, 0.05, 0.1); // Start from intersection
+		glVertex3f(1000, 0.05, 0.1); // Go to far east
+		glVertex3f(1000, 0.05, -0.1);
+		glVertex3f(10, 0.05, -0.1);
+	glEnd();
+
+	/*************************************************
+	* White dashed lines for lane seperation (Extra Credit)
+	*************************************************/
+	glColor3f(1, 1, 1);
+
+	float dashLength = 3.0f;
+	float gapLength = 9.0f;
+	float cycleLength = dashLength + gapLength;
+
+	// Draw dashed lines for North-South road
+	for (float z = -1000; z < 1000; z += cycleLength) {
+		// Skip the intersection area
+		if (z > -10 && z < 10) continue;
+
+		// Left lane divider
+		glBegin(GL_QUADS);
+			glVertex3f(-5.1, 0.05, z);
+			glVertex3f(-4.9, 0.05, z);
+			glVertex3f(-4.9, 0.05, z + dashLength);
+			glVertex3f(-5.1, 0.05, z + dashLength);
+		glEnd();
+
+		// Right lane divider
+		glBegin(GL_QUADS);
+			glVertex3f(4.9, 0.05, z);
+			glVertex3f(5.1, 0.05, z);
+			glVertex3f(5.1, 0.05, z + dashLength);
+			glVertex3f(4.9, 0.05, z + dashLength);
+		glEnd();
+	}
+
+	// Draw dashed lines for East-West road
+	for (float x = -1000; x < 1000; x += cycleLength) {
+		// Skip the intersection area
+		if (x > -10 && x < 10) continue;
+
+		// Upper lane divider
+		glBegin(GL_QUADS);
+			glVertex3f(x, 0.05, 5.1);
+			glVertex3f(x + dashLength, 0.05, 5.1);
+			glVertex3f(x + dashLength, 0.05, 4.9);
+			glVertex3f(x, 0.05, 4.9);
+		glEnd();
+
+		// Lower lane divider
+		glBegin(GL_QUADS);
+			glVertex3f(x, 0.05, -4.9);
+			glVertex3f(x + dashLength, 0.05, -4.9);
+			glVertex3f(x + dashLength, 0.05, -5.1);
+			glVertex3f(x, 0.05, -5.1);
+		glEnd();
+	}
 
 	glEndList();
 }
@@ -221,10 +385,25 @@ void display()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+	glDisable(GL_LIGHTING);
+	glColor3f(1, 1, 1);
+
+	glWindowPos2i(10, winHeight - 20);
+
 	// Generate head-up display (HUD)
 	stringstream ss;
+	ss << "Speed: " << fixed << setprecision(2) << carSpeed;
+	ss << " Direction: " << static_cast<int>(carDirection);
+	ss << " Position: (" << carPosition.x << ", " << carPosition.z << ")";
 
-	// Setup viewport, projection, and camera for the main view.
+	printString(ss.str());
+	glEnable(GL_LIGHTING);
+
+
+
+	/*************************************************
+	* Main View
+	*************************************************/
 	glViewport(0, 0, winWidth, winHeight - sHeight - 50);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
@@ -238,29 +417,90 @@ void display()
 
 	drawScene();
 
-	// Setup viewport, projection, and camera for the South-East camera and draw the scene again.
+	/*************************************************
+	* Right Side (South-East) Angled View
+	*************************************************/
+	glViewport(winWidth - sWidth, winHeight - sHeight, sWidth, sHeight);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	gluPerspective(45, static_cast<float>(sWidth) / sHeight, 1, 1000);
 
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
 
-	// Setup the viewport, projection, camera for the top view and draw the scene again.
+	float cameraDistanceFromCar = 30.0f;
+	float cameraHeight = 5.0f;
+	float cameraRightSideAngle = -45.0f;
 
+	float cameraRightSideX = carPosition.x + cameraDistanceFromCar * sin(cameraRightSideAngle * M_PI / 180.0f);
+	float cameraRightSideZ = carPosition.z + cameraDistanceFromCar * cos(cameraRightSideAngle * M_PI / 180.0f);
+
+	gluLookAt(cameraRightSideX, cameraHeight, cameraRightSideZ,
+		      carPosition.x, carPosition.y + 2, carPosition.z,
+			  0, 1, 0);
+
+	drawScene();
+
+	/*************************************************
+	* Top Down View
+	*************************************************/
+	int centerX = (winWidth - sWidth) / 2;
+
+	glViewport(centerX, winHeight - sHeight, sWidth, sHeight);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(-50, 50, -50, 50, -1000, 1000);
+
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	gluLookAt(0, 100, 0,   // Camera position (high up, looking down)
+			  carPosition.x, carPosition.y, carPosition.z,	   // Look at center
+			  0, 0, -1);   // Up vector (pointed south, since we're looking down)
+
+	drawScene();
 	
-	// Setup viewport, projection, camera for the South-West camera and draw the scene again.
+	/*************************************************
+	* Left Side (South-West) Angled View
+	*************************************************/
+	glViewport(0, winHeight - sHeight, sWidth, sHeight);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	gluPerspective(45, static_cast<float>(sWidth) / sHeight, 1, 1000);
+
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
+	float cameraLeftSideAngle = 45.0f;
+
+	float cameraLeftSideX = carPosition.x + cameraDistanceFromCar * sin(cameraLeftSideAngle * M_PI / 180.0f);
+	float cameraLeftSideZ = carPosition.z + cameraDistanceFromCar * cos(cameraLeftSideAngle * M_PI / 180.0f);
+
+	gluLookAt(cameraLeftSideX, cameraHeight, cameraLeftSideZ,
+		      carPosition.x, carPosition.y + 2, carPosition.z,
+			  0, 1, 0);
+
+	drawScene();
 
 	glutSwapBuffers();
 	glFlush();
 }
 
-/// Keyboard callback
-/// Handle regular key presses, and for P2, "r" for reset, "b" for break, and escape for quit.
+/**
+* Handle regular key presses, and for P2, "r" for reset, "b" for break, and escape for quit.
+*/
 void keyboard(unsigned char key, int x, int y)
 {
 	switch(key)
 	{
 	case 'r':
-		// Add code for reset
+	case 'R':
+		carPosition = { 3, 0, 45 };
+		carDirection = 180;
+		carSpeed = 0;
 		break;
 	case 'b':
-		// Add code for breaking.
+	case 'B':
+		carSpeed = 0;
 		break;
 	case 27:
 		exit(0);
@@ -270,11 +510,22 @@ void keyboard(unsigned char key, int x, int y)
 	glutPostRedisplay();
 }
 
-/// Updates the dynamic objects.
-/// Update the car position and traffic signals.
+/**
+* Updates the dynamic objects, the car position and traffic signals.
+*/
 void update()
 {
-	// Update car position.
+	float angleRadians = carDirection * M_PI / 180.0f;
+
+	carPosition.x += carSpeed * sin(angleRadians);
+	carPosition.z += carSpeed * cos(angleRadians);
+
+	if (carSpeed > 0) {
+		carSpeed = max(0.0f, carSpeed - deceleration);
+	}
+	else if (carSpeed < 0) {
+		carSpeed = min(0.0f, carSpeed + deceleration);
+	}
 
 	// State machine for the traffic signals using three variables: NS_Signal, WE_Signal, and counter.
 }
