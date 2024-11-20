@@ -9,6 +9,7 @@
 #include <sstream>
 #include <string>
 #include <iomanip>
+#include <algorithm>
 
 #include <cmath>
 
@@ -60,8 +61,12 @@ bool isTurningLeft = false;
 bool isTurningRight = false;
 
 bool treeId;
-const int NUM_TREES = 100;
-const float TREE_SPACING = 50.0f;
+struct TreeInstance {
+    float x, z;
+    float rotation;
+    float scale;
+};
+vector<TreeInstance> trees;
 
 Vector3 localCameraOffset = { 0, 0, -6 }; ///< Third person camera offset in the car's local space.
 Vector3 worldCameraOffset = localCameraOffset; ///< Third person camera offset in world space.
@@ -70,6 +75,12 @@ int winWidth; ///< Width of OpenGL window
 int winHeight; ///< Height of OpenGL window
 int sWidth; ///< Width of the small viewport
 int sHeight; ///< Height of the small viewport
+
+void drawTree();
+void initTrees();
+bool isNearTrafficLight(float x, float z);
+bool isValidTreePosition(float x, float z);
+void drawTrees();
 
 
 /// Update the small viewports' size automatically.
@@ -136,11 +147,11 @@ void specialKeyUp(int key, int x, int y)
 void drawScene()
 {
     // Draw terrain
-    glDisable(GL_LIGHTING);
     glCallList(terrainID);
 
+    drawTrees();
+
     glEnable(GL_LIGHTING);
-    glEnable(GL_LIGHT0);
 
     // North-East (NS_Signal)
     glPushMatrix();
@@ -223,8 +234,9 @@ void drawScene()
 /// Initialization.
 /// Set up lighting, generate display lists for the surveillance camera,
 /// car, and terrain.
-void init()
-{
+void init() {
+    initTrees();
+
     glClearColor(0.5, 0.5, 1.0, 1);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
@@ -670,6 +682,144 @@ void update()
 void drawTree() {
     // Tree trunk
     glColor3f(0.55f, 0.27f, 0.07f);
+    GLUquadricObj* trunk = gluNewQuadric();
+    glPushMatrix();
+    glRotatef(-90, 1, 0, 0); // Make the trunk vertical
+    gluCylinder(trunk, 0.5, 0.5, 4, 10, 1);
+    glPopMatrix();
+    gluDeleteQuadric(trunk);
+    
+    // Tree foliage
+    glColor3f(0.13f, 0.55f, 0.13f);
+    GLUquadricObj* leaves = gluNewQuadric();
+
+    // Bottom cone
+    glPushMatrix();
+    glTranslatef(0, 3, 0);
+    glRotatef(-90, 1, 0, 0);
+    gluCylinder(leaves, 3, 0, 4, 10, 1);
+    glPopMatrix();
+
+    // Middle cone
+    glPushMatrix();
+    glTranslatef(0, 5, 0);
+    glRotatef(-90, 1, 0, 0);
+    gluCylinder(leaves, 2.5, 0, 3.5, 10, 1);
+    glPopMatrix();
+
+    // Top cone
+    glPushMatrix();
+    glTranslatef(0, 7, 0);
+    glRotatef(-90, 1, 0, 0);
+    gluCylinder(leaves, 2, 0, 3, 10, 1);
+    glPopMatrix();
+
+    gluDeleteQuadric(leaves);
+}
+
+void initTrees() {
+    treeId = glGenLists(1);
+    glNewList(treeId, GL_COMPILE);
+    drawTree();
+    glEndList();
+
+    trees.clear();
+
+    const float TREE_SPACING = 50.0f;
+
+    for (int quadrant = 0; quadrant < 4; quadrant++) {
+        float xStart = (quadrant & 1) ? 20.0f : -1000.0f;
+        float xEnd = (quadrant & 1) ? 1000.0f : -20.0f;
+        float zStart = (quadrant & 2) ? 20.0f : -1000.0f;
+        float zEnd = (quadrant & 2) ? 1000.0f : -20.0f;
+
+        for (float x = xStart; x < xEnd; x += TREE_SPACING) {
+            for (float z = zStart; z < zEnd; z += TREE_SPACING) {
+                float offsetX = (rand() % 20) - 10.0f;
+                float offsetZ = (rand() % 20) - 10.0f;
+                float treeX = x + offsetX;
+                float treeZ = z + offsetZ;
+
+                if (isValidTreePosition(treeX, treeZ)) {
+                    TreeInstance tree;
+                    tree.x = treeX;
+                    tree.z = treeZ;
+                    tree.rotation = rand() % 360;
+                    tree.scale = 0.8f + (rand() % 4) * 0.1f;
+                    trees.push_back(tree);
+                }
+            }
+        }
+    }
+}
+
+/**
+* Checks to see if a tree position is too close to a traffic light
+*/
+bool isNearTrafficLight(float x, float z) {
+    struct TrafficLight {
+        float x;
+        float z;
+    };
+
+    const TrafficLight trafficLights[] = {
+        { 10.0f, -10.5f }, // North-East
+        { -10.0f, -10.5f }, // North-West
+        { 10.0f, 10.5f }, // South-East
+        { -10.0f, 10.5f }, // South-West
+    };
+
+    const float MIN_DISTANCE = 20.0f;
+
+    // Check distance to each traffic light
+    for (int i = 0; i < 4; i++) {
+        float lightX = trafficLights[i].x;
+        float lightZ = trafficLights[i].z;
+        
+        float distance = sqrt(pow(x - lightX, 2) + pow(z - lightZ, 2));
+        if (distance < MIN_DISTANCE)
+            return true;
+    }
+
+    return false;
+}
+
+/**
+* Checks to see if a tree can be placed in a location
+*/
+bool isValidTreePosition(float x, float z) {
+    const float ROAD_CLEARANCE = 15.0f;
+    if (abs(x) < ROAD_CLEARANCE || abs(z) < ROAD_CLEARANCE) {
+        return false;
+    }
+
+    if (isNearTrafficLight(x, z)) {
+        return false;
+    }
+
+    return true;
+}
+
+void drawTrees() {
+    glEnable(GL_DEPTH_TEST);
+    glDisable(GL_LIGHTING);
+
+    // Sort trees back to front
+    sort(trees.begin(), trees.end(),
+        [](const TreeInstance& a, const TreeInstance& b) {
+            return (a.z * a.z + a.x * a.x) > (b.z * b.z + b.x * b.x);
+        });
+
+    for (const auto& tree : trees) {
+        glPushMatrix();
+        glTranslatef(tree.x, 0, tree.z);
+        glRotatef(tree.rotation, 0, 1, 0);
+        glScalef(tree.scale, tree.scale, tree.scale);
+        glCallList(treeId);
+        glPopMatrix();
+    }
+
+    glEnable(GL_LIGHTING);
 }
 
 /// Set the interval between updates.
