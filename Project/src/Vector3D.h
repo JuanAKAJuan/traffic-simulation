@@ -4,7 +4,7 @@
 /// Structure for storing a 3D vector.
 
 struct Vector3 {
-	float x;
-	float y;
-	float z;
+    float x;
+    float y;
+    float z;
 };
