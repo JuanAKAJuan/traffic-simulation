@@ -1,0 +1,4 @@
+<map id="TrafficLight" name="TrafficLight">
+<area shape="rect" id="node2" href="$class_obj_model.html" title="A class for parsing and drawing OBJ 3D models. " alt="" coords="5,219,156,633"/>
+<area shape="rect" id="node3" href="$struct_bounding_box.html" title="{BoundingBox\n|+ xmin\l+ xmax\l+ ymin\l+ ymax\l+ zmin\l+ zmax\l|}" alt="" coords="31,5,130,156"/>
+</map>

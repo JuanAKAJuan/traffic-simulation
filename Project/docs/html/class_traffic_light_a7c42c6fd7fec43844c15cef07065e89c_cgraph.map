@@ -1,0 +1,6 @@
+<map id="TrafficLight::ReadFile" name="TrafficLight::ReadFile">
+<area shape="rect" id="node2" href="$class_obj_model.html#a15f75341b7f4640fcbba625a2921d0a3" title="ObjModel::ReadFile" alt="" coords="209,31,345,57"/>
+<area shape="rect" id="node5" href="$class_traffic_light.html#a39b442ede2ab03b3c799469e8e9e929c" title="TrafficLight::setMaterials" alt="" coords="196,81,359,108"/>
+<area shape="rect" id="node3" href="$class_obj_model.html#a7f49d82121d572bb050107b654784422" title="ObjModel::Reset" alt="" coords="420,5,539,32"/>
+<area shape="rect" id="node4" href="$class_p_p_m_image.html#a15886ec2be7de17d5d175e28ce35e33e" title="PPMImage::ReadFile" alt="" coords="407,56,552,83"/>
+</map>

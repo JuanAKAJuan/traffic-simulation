@@ -1,0 +1,6 @@
+<map id="drawScene" name="drawScene">
+<area shape="rect" id="node2" href="$main_8cpp.html#aa75fbddf6dcd2c14f772f798a6ceed26" title="drawTrees" alt="" coords="173,5,254,32"/>
+<area shape="rect" id="node3" href="$class_traffic_light.html#a2bde2f55bf4098321933c58104fc4f6d" title="TrafficLight::setSignal" alt="" coords="140,56,287,83"/>
+<area shape="rect" id="node4" href="$class_obj_model.html#a0388a82bb0d1e43674e50f803da54dab" title="ObjModel::Draw" alt="" coords="156,107,271,133"/>
+<area shape="rect" id="node5" href="$class_obj_model.html#a1c8e2bdebcfdc68f09932d817f7bd567" title="ObjModel::DrawMaterials" alt="" coords="335,107,501,133"/>
+</map>
